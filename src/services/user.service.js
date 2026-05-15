@@ -21,36 +21,32 @@ export async function upsertAuthUser(payload) {
   }
 
   const now = new Date()
-  const existingUser = await findUserByEmail(email)
-
-  if (existingUser) {
-    const updates = {
-      updatedAt: now,
-    }
-
-    if (payload.name && payload.name !== existingUser.name) updates.name = payload.name
-    if (payload.photoURL && payload.photoURL !== existingUser.photoURL) updates.photoURL = payload.photoURL
-
-    if (Object.keys(updates).length > 1) {
-      await usersCollection().updateOne({ email }, { $set: updates })
-    }
-
-    return findUserByEmail(email)
-  }
-
-  const user = {
-    name: payload.name || email.split('@')[0],
-    email,
-    photoURL: payload.photoURL || '',
-    role: publicSignupRoles.includes(payload.role) ? payload.role : 'user',
-    bio: '',
-    winCount: 0,
-    createdAt: now,
+  const updates = {
     updatedAt: now,
   }
 
-  await usersCollection().insertOne(user)
-  return findUserByEmail(email)
+  if (payload.name) updates.name = payload.name
+  if (payload.photoURL) updates.photoURL = payload.photoURL
+
+  const result = await usersCollection().findOneAndUpdate(
+    { email },
+    {
+      $set: updates,
+      $setOnInsert: {
+        email,
+        role: publicSignupRoles.includes(payload.role) ? payload.role : 'user',
+        bio: '',
+        winCount: 0,
+        createdAt: now,
+      },
+    },
+    {
+      upsert: true,
+      returnDocument: 'after',
+    },
+  )
+
+  return result
 }
 
 export function serializeUser(user) {

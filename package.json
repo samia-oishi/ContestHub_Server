@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "make-admin": "node src/scripts/makeAdmin.js"
+    "make-admin": "node src/scripts/makeAdmin.js",
+    "set-role": "node src/scripts/setRole.js"
   },
   "keywords": [],
   "author": "",

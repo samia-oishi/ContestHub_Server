@@ -14,6 +14,52 @@ function contestsCollection() {
   return getDB().collection('contests')
 }
 
+function normalizeContestPayload(payload) {
+  const title = payload.title?.trim()
+  const image = payload.image?.trim()
+  const description = payload.description?.trim()
+  const taskInstruction = payload.taskInstruction?.trim()
+  const type = payload.type?.trim()
+  const price = Number(payload.price)
+  const prizeMoney = Number(payload.prizeMoney)
+  const deadline = payload.deadline ? new Date(payload.deadline) : null
+
+  if (!title || !image || !description || !taskInstruction || !type) {
+    const error = new Error('All contest fields are required')
+    error.statusCode = 400
+    throw error
+  }
+
+  if (!contestTypes.includes(type)) {
+    const error = new Error('Invalid contest type')
+    error.statusCode = 400
+    throw error
+  }
+
+  if (!Number.isFinite(price) || price < 0 || !Number.isFinite(prizeMoney) || prizeMoney < 0) {
+    const error = new Error('Price and prize money must be valid positive numbers')
+    error.statusCode = 400
+    throw error
+  }
+
+  if (!deadline || Number.isNaN(deadline.getTime()) || deadline.getTime() <= Date.now()) {
+    const error = new Error('Deadline must be a future date')
+    error.statusCode = 400
+    throw error
+  }
+
+  return {
+    title,
+    image,
+    description,
+    taskInstruction,
+    type,
+    price,
+    prizeMoney,
+    deadline,
+  }
+}
+
 function approvedContestFilter({ type, search } = {}) {
   const filter = { status: 'approved' }
   const normalizedType = type?.trim()
@@ -72,4 +118,84 @@ export async function findApprovedContestById(id) {
   })
 
   return serializeDocument(contest)
+}
+
+export async function createContest(payload, creator) {
+  const now = new Date()
+  const contest = {
+    ...normalizeContestPayload(payload),
+    creatorEmail: creator.email,
+    creatorName: creator.name || creator.email,
+    status: 'pending',
+    participantCount: 0,
+    winnerUserId: null,
+    winnerName: '',
+    winnerPhoto: '',
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  const result = await contestsCollection().insertOne(contest)
+  return serializeDocument({ ...contest, _id: result.insertedId })
+}
+
+export async function listCreatorContests(email) {
+  const contests = await contestsCollection()
+    .find({ creatorEmail: email })
+    .sort({ createdAt: -1 })
+    .toArray()
+
+  return contests.map(serializeDocument)
+}
+
+export async function findCreatorContestById(id, email) {
+  const contest = await contestsCollection().findOne({
+    _id: toObjectId(id),
+    creatorEmail: email,
+  })
+
+  return serializeDocument(contest)
+}
+
+export async function updateCreatorContest(id, email, payload) {
+  const contest = await findCreatorContestById(id, email)
+
+  if (!contest) {
+    const error = new Error('Contest not found')
+    error.statusCode = 404
+    throw error
+  }
+
+  if (contest.status !== 'pending') {
+    const error = new Error('Only pending contests can be edited')
+    error.statusCode = 409
+    throw error
+  }
+
+  const updates = {
+    ...normalizeContestPayload(payload),
+    updatedAt: new Date(),
+  }
+
+  await contestsCollection().updateOne({ _id: toObjectId(id) }, { $set: updates })
+  return findCreatorContestById(id, email)
+}
+
+export async function deleteCreatorContest(id, email) {
+  const contest = await findCreatorContestById(id, email)
+
+  if (!contest) {
+    const error = new Error('Contest not found')
+    error.statusCode = 404
+    throw error
+  }
+
+  if (contest.status !== 'pending') {
+    const error = new Error('Only pending contests can be deleted')
+    error.statusCode = 409
+    throw error
+  }
+
+  await contestsCollection().deleteOne({ _id: toObjectId(id) })
+  return contest
 }

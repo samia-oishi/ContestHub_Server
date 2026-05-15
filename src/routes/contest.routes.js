@@ -1,11 +1,17 @@
 import { Router } from 'express'
 import { verifyJwt } from '../middleware/verifyJwt.js'
+import { verifyRole } from '../middleware/verifyRole.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
 import {
   contestTypes,
+  createContest,
+  deleteCreatorContest,
   findApprovedContestById,
+  findCreatorContestById,
   listApprovedContests,
+  listCreatorContests,
   listPopularContests,
+  updateCreatorContest,
 } from '../services/contest.service.js'
 
 const router = Router()
@@ -31,6 +37,31 @@ router.get('/types', (req, res) => {
 })
 
 router.get(
+  '/mine',
+  verifyJwt,
+  verifyRole('creator'),
+  asyncHandler(async (req, res) => {
+    const data = await listCreatorContests(req.user.email)
+    res.json({ success: true, data })
+  }),
+)
+
+router.get(
+  '/mine/:id',
+  verifyJwt,
+  verifyRole('creator'),
+  asyncHandler(async (req, res) => {
+    const contest = await findCreatorContestById(req.params.id, req.user.email)
+
+    if (!contest) {
+      return res.status(404).json({ success: false, message: 'Contest not found' })
+    }
+
+    res.json({ success: true, data: contest })
+  }),
+)
+
+router.get(
   '/:id',
   verifyJwt,
   asyncHandler(async (req, res) => {
@@ -44,20 +75,42 @@ router.get(
   }),
 )
 
-router.post('/', verifyJwt, (req, res) => {
-  res.status(501).json({ success: false, message: 'Contest creation will be implemented in the creator phase' })
-})
+router.post(
+  '/',
+  verifyJwt,
+  verifyRole('creator'),
+  asyncHandler(async (req, res) => {
+    const data = await createContest(req.body, req.user)
+    res.status(201).json({ success: true, message: 'Contest submitted for approval', data })
+  }),
+)
 
-router.patch('/:id', verifyJwt, (req, res) => {
-  res.status(501).json({ success: false, message: 'Contest editing will be implemented in the creator phase' })
-})
+router.patch(
+  '/:id',
+  verifyJwt,
+  verifyRole('creator'),
+  asyncHandler(async (req, res) => {
+    const data = await updateCreatorContest(req.params.id, req.user.email, req.body)
+    res.json({ success: true, message: 'Contest updated', data })
+  }),
+)
 
 router.patch('/:id/status', verifyJwt, (req, res) => {
   res.status(501).json({ success: false, message: 'Contest approval will be implemented in the admin phase' })
 })
 
-router.delete('/:id', verifyJwt, (req, res) => {
-  res.status(501).json({ success: false, message: 'Contest deletion will be implemented in the creator/admin phase' })
-})
+router.delete(
+  '/:id',
+  verifyJwt,
+  verifyRole('creator', 'admin'),
+  asyncHandler(async (req, res) => {
+    if (req.user.role === 'admin') {
+      return res.status(501).json({ success: false, message: 'Admin deletion will be implemented in the admin phase' })
+    }
+
+    const data = await deleteCreatorContest(req.params.id, req.user.email)
+    res.json({ success: true, message: 'Contest deleted', data })
+  }),
+)
 
 export default router
