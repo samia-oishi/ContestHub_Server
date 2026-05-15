@@ -1,19 +1,48 @@
 import { Router } from 'express'
 import { verifyJwt } from '../middleware/verifyJwt.js'
+import { asyncHandler } from '../utils/asyncHandler.js'
+import {
+  contestTypes,
+  findApprovedContestById,
+  listApprovedContests,
+  listPopularContests,
+} from '../services/contest.service.js'
 
 const router = Router()
 
-router.get('/', (req, res) => {
-  res.json({ success: true, data: [], message: 'Contest listing endpoint is ready for implementation' })
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const data = await listApprovedContests(req.query)
+    res.json({ success: true, data })
+  }),
+)
+
+router.get(
+  '/popular',
+  asyncHandler(async (req, res) => {
+    const data = await listPopularContests(req.query.limit)
+    res.json({ success: true, data })
+  }),
+)
+
+router.get('/types', (req, res) => {
+  res.json({ success: true, data: contestTypes })
 })
 
-router.get('/popular', (req, res) => {
-  res.json({ success: true, data: [], message: 'Popular contest endpoint is ready for implementation' })
-})
+router.get(
+  '/:id',
+  verifyJwt,
+  asyncHandler(async (req, res) => {
+    const contest = await findApprovedContestById(req.params.id)
 
-router.get('/:id', verifyJwt, (req, res) => {
-  res.status(501).json({ success: false, message: 'Contest details will be implemented in the contest browsing phase' })
-})
+    if (!contest) {
+      return res.status(404).json({ success: false, message: 'Contest not found' })
+    }
+
+    res.json({ success: true, data: contest })
+  }),
+)
 
 router.post('/', verifyJwt, (req, res) => {
   res.status(501).json({ success: false, message: 'Contest creation will be implemented in the creator phase' })

@@ -1,6 +1,7 @@
 import { getDB } from '../config/db.js'
 
 const allowedRoles = ['user', 'creator', 'admin']
+const publicSignupRoles = ['user', 'creator']
 
 export function usersCollection() {
   return getDB().collection('users')
@@ -41,7 +42,7 @@ export async function upsertAuthUser(payload) {
     name: payload.name || email.split('@')[0],
     email,
     photoURL: payload.photoURL || '',
-    role: allowedRoles.includes(payload.role) ? payload.role : 'user',
+    role: publicSignupRoles.includes(payload.role) ? payload.role : 'user',
     bio: '',
     winCount: 0,
     createdAt: now,

@@ -9,6 +9,7 @@ import registrationRoutes from './routes/registration.routes.js'
 import statsRoutes from './routes/stats.routes.js'
 import submissionRoutes from './routes/submission.routes.js'
 import userRoutes from './routes/user.routes.js'
+import { corsOptions } from './config/cors.js'
 import { errorHandler, notFound } from './middleware/errorHandler.js'
 import { pingDB } from './config/db.js'
 
@@ -16,12 +17,7 @@ dotenv.config()
 
 const app = express()
 
-app.use(
-  cors({
-    origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
-    credentials: true,
-  }),
-)
+app.use(cors(corsOptions()))
 app.use(express.json())
 app.use(cookieParser())
 
