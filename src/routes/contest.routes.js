@@ -5,12 +5,15 @@ import { asyncHandler } from '../utils/asyncHandler.js'
 import {
   contestTypes,
   createContest,
+  deleteContestAsAdmin,
   deleteCreatorContest,
   findApprovedContestById,
   findCreatorContestById,
+  listAllContestsForAdmin,
   listApprovedContests,
   listCreatorContests,
   listPopularContests,
+  updateContestStatus,
   updateCreatorContest,
 } from '../services/contest.service.js'
 
@@ -42,6 +45,16 @@ router.get(
   verifyRole('creator'),
   asyncHandler(async (req, res) => {
     const data = await listCreatorContests(req.user.email)
+    res.json({ success: true, data })
+  }),
+)
+
+router.get(
+  '/admin/all',
+  verifyJwt,
+  verifyRole('admin'),
+  asyncHandler(async (req, res) => {
+    const data = await listAllContestsForAdmin(req.query)
     res.json({ success: true, data })
   }),
 )
@@ -95,9 +108,15 @@ router.patch(
   }),
 )
 
-router.patch('/:id/status', verifyJwt, (req, res) => {
-  res.status(501).json({ success: false, message: 'Contest approval will be implemented in the admin phase' })
-})
+router.patch(
+  '/:id/status',
+  verifyJwt,
+  verifyRole('admin'),
+  asyncHandler(async (req, res) => {
+    const data = await updateContestStatus(req.params.id, req.body.status)
+    res.json({ success: true, message: 'Contest status updated', data })
+  }),
+)
 
 router.delete(
   '/:id',
@@ -105,7 +124,8 @@ router.delete(
   verifyRole('creator', 'admin'),
   asyncHandler(async (req, res) => {
     if (req.user.role === 'admin') {
-      return res.status(501).json({ success: false, message: 'Admin deletion will be implemented in the admin phase' })
+      const data = await deleteContestAsAdmin(req.params.id)
+      return res.json({ success: true, message: 'Contest deleted', data })
     }
 
     const data = await deleteCreatorContest(req.params.id, req.user.email)

@@ -1,4 +1,5 @@
 import { getDB } from '../config/db.js'
+import { toObjectId } from '../utils/mongo.js'
 
 const allowedRoles = ['user', 'creator', 'admin']
 const publicSignupRoles = ['user', 'creator']
@@ -9,6 +10,51 @@ export function usersCollection() {
 
 export async function findUserByEmail(email) {
   return usersCollection().findOne({ email })
+}
+
+export async function listUsers({ page = 1, limit = 10 } = {}) {
+  const safePage = Math.max(Number(page) || 1, 1)
+  const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 50)
+
+  const [items, total] = await Promise.all([
+    usersCollection()
+      .find({})
+      .sort({ createdAt: -1 })
+      .skip((safePage - 1) * safeLimit)
+      .limit(safeLimit)
+      .toArray(),
+    usersCollection().countDocuments(),
+  ])
+
+  return {
+    items: items.map(serializeUser),
+    total,
+    page: safePage,
+    limit: safeLimit,
+    totalPages: Math.ceil(total / safeLimit),
+  }
+}
+
+export async function updateUserRole(id, role) {
+  if (!allowedRoles.includes(role)) {
+    const error = new Error('Invalid role')
+    error.statusCode = 400
+    throw error
+  }
+
+  const result = await usersCollection().findOneAndUpdate(
+    { _id: toObjectId(id) },
+    { $set: { role, updatedAt: new Date() } },
+    { returnDocument: 'after' },
+  )
+
+  if (!result) {
+    const error = new Error('User not found')
+    error.statusCode = 404
+    throw error
+  }
+
+  return result
 }
 
 export async function upsertAuthUser(payload) {

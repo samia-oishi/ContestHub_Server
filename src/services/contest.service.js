@@ -199,3 +199,67 @@ export async function deleteCreatorContest(id, email) {
   await contestsCollection().deleteOne({ _id: toObjectId(id) })
   return contest
 }
+
+export async function listAllContestsForAdmin({ page = 1, limit = 10, status } = {}) {
+  const safePage = Math.max(Number(page) || 1, 1)
+  const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 50)
+  const normalizedStatus = status?.trim()
+  const filter = ['pending', 'approved', 'rejected'].includes(normalizedStatus)
+    ? { status: normalizedStatus }
+    : {}
+
+  const [items, total] = await Promise.all([
+    contestsCollection()
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .skip((safePage - 1) * safeLimit)
+      .limit(safeLimit)
+      .toArray(),
+    contestsCollection().countDocuments(filter),
+  ])
+
+  return {
+    items: items.map(serializeDocument),
+    total,
+    page: safePage,
+    limit: safeLimit,
+    totalPages: Math.ceil(total / safeLimit),
+  }
+}
+
+export async function updateContestStatus(id, status) {
+  const allowedStatuses = ['pending', 'approved', 'rejected']
+
+  if (!allowedStatuses.includes(status)) {
+    const error = new Error('Invalid contest status')
+    error.statusCode = 400
+    throw error
+  }
+
+  const result = await contestsCollection().findOneAndUpdate(
+    { _id: toObjectId(id) },
+    { $set: { status, updatedAt: new Date() } },
+    { returnDocument: 'after' },
+  )
+
+  if (!result) {
+    const error = new Error('Contest not found')
+    error.statusCode = 404
+    throw error
+  }
+
+  return serializeDocument(result)
+}
+
+export async function deleteContestAsAdmin(id) {
+  const contest = await contestsCollection().findOne({ _id: toObjectId(id) })
+
+  if (!contest) {
+    const error = new Error('Contest not found')
+    error.statusCode = 404
+    throw error
+  }
+
+  await contestsCollection().deleteOne({ _id: toObjectId(id) })
+  return serializeDocument(contest)
+}
