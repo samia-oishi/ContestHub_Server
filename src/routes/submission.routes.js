@@ -2,46 +2,52 @@ import { Router } from 'express'
 import { verifyJwt } from '../middleware/verifyJwt.js'
 import { verifyRole } from '../middleware/verifyRole.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
-import { getDB } from '../config/db.js'
+import {
+  createSubmission,
+  declareWinner,
+  getSubmissionStatus,
+  listCreatorSubmissions,
+} from '../services/submission.service.js'
 
 const router = Router()
 
-router.post('/', verifyJwt, (req, res) => {
-  res.status(501).json({ success: false, message: 'Task submission will be implemented in the submission phase' })
-})
+router.post(
+  '/',
+  verifyJwt,
+  verifyRole('user'),
+  asyncHandler(async (req, res) => {
+    const data = await createSubmission(req.body, req.user)
+    res.status(201).json({ success: true, message: 'Task submitted', data })
+  }),
+)
+
+router.get(
+  '/check/:contestId',
+  verifyJwt,
+  asyncHandler(async (req, res) => {
+    const data = await getSubmissionStatus(req.params.contestId, req.user.email)
+    res.json({ success: true, data })
+  }),
+)
 
 router.get(
   '/creator',
   verifyJwt,
   verifyRole('creator'),
   asyncHandler(async (req, res) => {
-    const db = getDB()
-    const contests = await db.collection('contests').find({ creatorEmail: req.user.email }, { projection: { _id: 1, title: 1 } }).toArray()
-    const contestMap = new Map(contests.map((contest) => [contest._id.toString(), contest.title]))
-    const contestIds = Array.from(contestMap.keys())
-
-    if (contestIds.length === 0) {
-      return res.json({ success: true, data: [] })
-    }
-
-    const submissions = await db
-      .collection('submissions')
-      .find({ contestId: { $in: contestIds } })
-      .sort({ submittedAt: -1 })
-      .toArray()
-
-    const data = submissions.map((submission) => ({
-      ...submission,
-      _id: submission._id.toString(),
-      contestTitle: contestMap.get(submission.contestId),
-    }))
-
+    const data = await listCreatorSubmissions(req.user.email)
     res.json({ success: true, data })
   }),
 )
 
-router.patch('/:id/winner', verifyJwt, (req, res) => {
-  res.status(501).json({ success: false, message: 'Winner declaration will be implemented in the winner phase' })
-})
+router.patch(
+  '/:id/winner',
+  verifyJwt,
+  verifyRole('creator'),
+  asyncHandler(async (req, res) => {
+    const data = await declareWinner(req.params.id, req.user)
+    res.json({ success: true, message: 'Winner declared', data })
+  }),
+)
 
 export default router
