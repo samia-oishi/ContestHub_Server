@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { verifyJwt } from '../middleware/verifyJwt.js'
 import { verifyRole } from '../middleware/verifyRole.js'
 import { asyncHandler } from '../utils/asyncHandler.js'
-import { findUserByEmail, listUsers, serializeUser, updateUserRole } from '../services/user.service.js'
+import { findUserByEmail, listUsers, serializeUser, updateUserProfile, updateUserRole } from '../services/user.service.js'
 
 const router = Router()
 
@@ -30,9 +30,14 @@ router.get(
   }),
 )
 
-router.patch('/me', verifyJwt, (req, res) => {
-  res.status(501).json({ success: false, message: 'Profile update will be implemented in the user dashboard phase' })
-})
+router.patch(
+  '/me',
+  verifyJwt,
+  asyncHandler(async (req, res) => {
+    const user = await updateUserProfile(req.user.email, req.body)
+    res.json({ success: true, message: 'Profile updated', data: serializeUser(user) })
+  }),
+)
 
 router.patch(
   '/:id/role',
