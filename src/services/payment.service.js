@@ -56,6 +56,12 @@ async function getPayableContest(contestId) {
 }
 
 export async function createPaymentIntent(contestId, user) {
+  if (!contestId) {
+    const error = new Error('Contest id is required')
+    error.statusCode = 400
+    throw error
+  }
+
   await ensurePaymentIndexes()
 
   const { contest, amount } = await getPayableContest(contestId)
@@ -89,6 +95,12 @@ export async function createPaymentIntent(contestId, user) {
 }
 
 export async function confirmRegistration({ contestId, paymentIntentId }, user) {
+  if (!contestId) {
+    const error = new Error('Contest id is required')
+    error.statusCode = 400
+    throw error
+  }
+
   if (!paymentIntentId) {
     const error = new Error('Payment intent id is required')
     error.statusCode = 400
@@ -165,10 +177,16 @@ export async function confirmRegistration({ contestId, paymentIntentId }, user) 
     userEmail: user.email,
   })
 
-  return serializeDocument(registration)
+  return serializeRegistration(registration)
 }
 
 export async function getRegistrationStatus(contestId, email) {
+  if (!contestId) {
+    const error = new Error('Contest id is required')
+    error.statusCode = 400
+    throw error
+  }
+
   const registration = await registrationsCollection().findOne({
     contestId: toObjectId(contestId),
     userEmail: email,
@@ -176,7 +194,7 @@ export async function getRegistrationStatus(contestId, email) {
 
   return {
     registered: Boolean(registration),
-    registration: serializeDocument(registration),
+    registration: serializeRegistration(registration),
   }
 }
 
@@ -197,5 +215,60 @@ export async function listUserRegistrations(email) {
     ])
     .toArray()
 
-  return registrations.map(serializeDocument)
+  return registrations.map(serializeRegistration)
+}
+
+export async function listUserWinningRegistrations(email) {
+  const registrations = await registrationsCollection()
+    .aggregate([
+      { $match: { userEmail: email, isWinner: true } },
+      {
+        $lookup: {
+          from: 'contests',
+          localField: 'contestId',
+          foreignField: '_id',
+          as: 'contest',
+        },
+      },
+      { $unwind: { path: '$contest', preserveNullAndEmptyArrays: true } },
+      { $sort: { registeredAt: -1 } },
+    ])
+    .toArray()
+
+  return registrations.map(serializeRegistration)
+}
+
+export async function getUserProfileStats(email) {
+  const [participated, wins] = await Promise.all([
+    registrationsCollection().countDocuments({ userEmail: email }),
+    registrationsCollection().countDocuments({ userEmail: email, isWinner: true }),
+  ])
+  const losses = Math.max(participated - wins, 0)
+  const winPercentage = participated ? Math.round((wins / participated) * 100) : 0
+
+  return {
+    participated,
+    wins,
+    losses,
+    winPercentage,
+    chartData: [
+      { name: 'Wins', value: wins },
+      { name: 'Other contests', value: losses },
+    ],
+  }
+}
+
+function serializeRegistration(registration) {
+  if (!registration) return null
+
+  return {
+    ...serializeDocument(registration),
+    contestId: registration.contestId?.toString(),
+    contest: registration.contest
+      ? {
+          ...registration.contest,
+          _id: registration.contest._id?.toString(),
+        }
+      : null,
+  }
 }

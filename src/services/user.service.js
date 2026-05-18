@@ -57,6 +57,64 @@ export async function updateUserRole(id, role) {
   return result
 }
 
+export async function updateUserProfile(email, payload) {
+  const updates = {
+    updatedAt: new Date(),
+  }
+  const allowedFields = ['name', 'photoURL', 'bio', 'address']
+  const hasProfileField = allowedFields.some((field) => Object.prototype.hasOwnProperty.call(payload, field))
+
+  if (!hasProfileField) {
+    const error = new Error('No profile changes provided')
+    error.statusCode = 400
+    throw error
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'name')) {
+    const name = payload.name?.trim()
+
+    if (!name) {
+      const error = new Error('Name is required')
+      error.statusCode = 400
+      throw error
+    }
+
+    updates.name = name
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'photoURL')) {
+    updates.photoURL = payload.photoURL?.trim() || ''
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'bio')) {
+    updates.bio = (payload.bio?.trim() || '').slice(0, 300)
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'address')) {
+    updates.address = (payload.address?.trim() || '').slice(0, 160)
+  }
+
+  if (updates.photoURL && !/^https?:\/\/.+/i.test(updates.photoURL)) {
+    const error = new Error('Photo URL must start with http or https')
+    error.statusCode = 400
+    throw error
+  }
+
+  const result = await usersCollection().findOneAndUpdate(
+    { email },
+    { $set: updates },
+    { returnDocument: 'after' },
+  )
+
+  if (!result) {
+    const error = new Error('User profile not found')
+    error.statusCode = 404
+    throw error
+  }
+
+  return result
+}
+
 export async function upsertAuthUser(payload) {
   const email = payload.email?.toLowerCase().trim()
 
@@ -105,6 +163,7 @@ export function serializeUser(user) {
     photoURL: user.photoURL,
     role: user.role || 'user',
     bio: user.bio || '',
+    address: user.address || '',
     winCount: user.winCount || 0,
   }
 }

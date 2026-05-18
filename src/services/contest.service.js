@@ -14,6 +14,18 @@ function contestsCollection() {
   return getDB().collection('contests')
 }
 
+function registrationsCollection() {
+  return getDB().collection('registrations')
+}
+
+function submissionsCollection() {
+  return getDB().collection('submissions')
+}
+
+function paymentsCollection() {
+  return getDB().collection('payments')
+}
+
 function normalizeContestPayload(payload) {
   const title = payload.title?.trim()
   const image = payload.image?.trim()
@@ -260,6 +272,12 @@ export async function deleteContestAsAdmin(id) {
     throw error
   }
 
-  await contestsCollection().deleteOne({ _id: toObjectId(id) })
+  await Promise.all([
+    contestsCollection().deleteOne({ _id: contest._id }),
+    registrationsCollection().deleteMany({ contestId: contest._id }),
+    submissionsCollection().deleteMany({ contestId: contest._id }),
+    paymentsCollection().deleteMany({ contestId: contest._id }),
+  ])
+
   return serializeDocument(contest)
 }

@@ -40,6 +40,12 @@ function normalizeTask(payload) {
 }
 
 export async function createSubmission(payload, user) {
+  if (!payload.contestId) {
+    const error = new Error('Contest id is required')
+    error.statusCode = 400
+    throw error
+  }
+
   await ensureSubmissionIndexes()
 
   const contestId = toObjectId(payload.contestId)
@@ -97,6 +103,12 @@ export async function createSubmission(payload, user) {
 }
 
 export async function getSubmissionStatus(contestId, email) {
+  if (!contestId) {
+    const error = new Error('Contest id is required')
+    error.statusCode = 400
+    throw error
+  }
+
   const submission = await submissionsCollection().findOne({
     contestId: toObjectId(contestId),
     userEmail: email,
@@ -129,7 +141,7 @@ export async function listCreatorSubmissions(email) {
       ...submission,
       contestTitle: contest?.title,
       contestDeadline: contest?.deadline,
-      contestHasWinner: Boolean(contest?.winnerUserId),
+      contestHasWinner: Boolean(contest?.winnerUserId || contest?.winnerName),
     })
   })
 }
@@ -168,7 +180,7 @@ export async function declareWinner(submissionId, creator) {
 
   const winner = await usersCollection().findOne({ email: submission.userEmail })
   const now = new Date()
-  const winnerUserId = winner?._id || null
+  const winnerUserId = winner?._id?.toString() || null
   const winnerName = submission.userName || submission.userEmail
   const winnerPhoto = submission.userPhoto || winner?.photoURL || ''
 
