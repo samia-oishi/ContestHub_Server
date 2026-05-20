@@ -37,6 +37,9 @@ DB_NAME=contesthub
 JWT_SECRET=
 CLIENT_ORIGIN=http://localhost:5173
 STRIPE_SECRET_KEY=
+FIREBASE_PROJECT_ID=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY=
 NODE_ENV=development
 ```
 
@@ -61,4 +64,4 @@ http://localhost:5000/health
 
 ## Deployment
 
-I will deploy this backend on Vercel. MongoDB URI, JWT secret, Stripe secret key, and client URL need to be added in Vercel environment variables.
+I will deploy this backend on Vercel. MongoDB URI, JWT secret, Stripe secret key, Firebase admin keys, and client URL need to be added in Vercel environment variables.
