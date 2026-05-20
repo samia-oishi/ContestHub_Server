@@ -87,11 +87,27 @@ export async function updateUserProfile(email, payload) {
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, 'bio')) {
-    updates.bio = (payload.bio?.trim() || '').slice(0, 300)
+    const bio = payload.bio?.trim() || ''
+
+    if (bio.length > 300) {
+      const error = new Error('Bio must be 300 characters or less')
+      error.statusCode = 400
+      throw error
+    }
+
+    updates.bio = bio
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, 'address')) {
-    updates.address = (payload.address?.trim() || '').slice(0, 160)
+    const address = payload.address?.trim() || ''
+
+    if (address.length > 160) {
+      const error = new Error('Address must be 160 characters or less')
+      error.statusCode = 400
+      throw error
+    }
+
+    updates.address = address
   }
 
   if (updates.photoURL && !/^https?:\/\/.+/i.test(updates.photoURL)) {

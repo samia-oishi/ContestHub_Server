@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
+import { findUserByEmail, serializeUser } from '../services/user.service.js'
 
-export function verifyJwt(req, res, next) {
+export async function verifyJwt(req, res, next) {
   const token = req.cookies?.token
 
   if (!token) {
@@ -12,7 +13,14 @@ export function verifyJwt(req, res, next) {
       throw new Error('JWT_SECRET is not configured')
     }
 
-    req.user = jwt.verify(token, process.env.JWT_SECRET)
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    const user = await findUserByEmail(decoded.email)
+
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User profile not found' })
+    }
+
+    req.user = serializeUser(user)
     next()
   } catch {
     res.status(401).json({ success: false, message: 'Invalid or expired token' })
