@@ -11,7 +11,7 @@ import submissionRoutes from './routes/submission.routes.js'
 import userRoutes from './routes/user.routes.js'
 import { corsOptions } from './config/cors.js'
 import { errorHandler, notFound } from './middleware/errorHandler.js'
-import { pingDB } from './config/db.js'
+import { connectDB, pingDB } from './config/db.js'
 
 dotenv.config()
 
@@ -20,6 +20,15 @@ const app = express()
 app.use(cors(corsOptions()))
 app.use(express.json())
 app.use(cookieParser())
+
+app.use(async (req, res, next) => {
+  try {
+    await connectDB()
+    next()
+  } catch (error) {
+    next(error)
+  }
+})
 
 app.get('/', (req, res) => {
   res.json({ success: true, message: 'ContestHub API is running' })
