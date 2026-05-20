@@ -122,7 +122,7 @@ export async function getSubmissionStatus(contestId, email) {
 
 export async function listCreatorSubmissions(email) {
   const contests = await contestsCollection()
-    .find({ creatorEmail: email }, { projection: { _id: 1, title: 1, deadline: 1, winnerUserId: 1 } })
+    .find({ creatorEmail: email }, { projection: { _id: 1, title: 1, deadline: 1, winnerUserId: 1, winnerName: 1 } })
     .toArray()
   const contestMap = new Map(contests.map((contest) => [contest._id.toString(), contest]))
   const contestIds = contests.map((contest) => contest._id)
@@ -172,28 +172,21 @@ export async function declareWinner(submissionId, creator) {
     throw error
   }
 
-  if (contest.winnerUserId) {
-    const error = new Error('Winner has already been declared for this contest')
-    error.statusCode = 409
-    throw error
-  }
-
   const winner = await usersCollection().findOne({ email: submission.userEmail })
   const now = new Date()
   const winnerUserId = winner?._id?.toString() || null
   const winnerName = submission.userName || submission.userEmail
   const winnerPhoto = submission.userPhoto || winner?.photoURL || ''
 
-  await submissionsCollection().updateMany(
-    { contestId: submission.contestId },
-    { $set: { isWinner: false, status: 'reviewed', updatedAt: now } },
-  )
-  await submissionsCollection().updateOne(
-    { _id: submission._id },
-    { $set: { isWinner: true, status: 'winner', updatedAt: now } },
-  )
-  await contestsCollection().updateOne(
-    { _id: contest._id },
+  const contestUpdate = await contestsCollection().updateOne(
+    {
+      _id: contest._id,
+      creatorEmail: creator.email,
+      $and: [
+        { $or: [{ winnerUserId: null }, { winnerUserId: '' }, { winnerUserId: { $exists: false } }] },
+        { $or: [{ winnerName: '' }, { winnerName: { $exists: false } }] },
+      ],
+    },
     {
       $set: {
         winnerUserId,
@@ -202,6 +195,21 @@ export async function declareWinner(submissionId, creator) {
         updatedAt: now,
       },
     },
+  )
+
+  if (!contestUpdate.matchedCount) {
+    const error = new Error('Winner has already been declared for this contest')
+    error.statusCode = 409
+    throw error
+  }
+
+  await submissionsCollection().updateMany(
+    { contestId: submission.contestId },
+    { $set: { isWinner: false, status: 'reviewed', updatedAt: now } },
+  )
+  await submissionsCollection().updateOne(
+    { _id: submission._id },
+    { $set: { isWinner: true, status: 'winner', updatedAt: now } },
   )
   await registrationsCollection().updateMany(
     { contestId: contest._id },

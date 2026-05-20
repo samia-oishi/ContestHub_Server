@@ -48,8 +48,8 @@ function normalizeContestPayload(payload) {
     throw error
   }
 
-  if (!Number.isFinite(price) || price < 0 || !Number.isFinite(prizeMoney) || prizeMoney < 0) {
-    const error = new Error('Price and prize money must be valid positive numbers')
+  if (!Number.isFinite(price) || price < 0.5 || !Number.isFinite(prizeMoney) || prizeMoney < 0) {
+    const error = new Error('Price must be at least 0.50 and prize money must be a valid positive number')
     error.statusCode = 400
     throw error
   }
@@ -248,17 +248,26 @@ export async function updateContestStatus(id, status) {
     throw error
   }
 
-  const result = await contestsCollection().findOneAndUpdate(
-    { _id: toObjectId(id) },
-    { $set: { status, updatedAt: new Date() } },
-    { returnDocument: 'after' },
-  )
+  const contestId = toObjectId(id)
+  const contest = await contestsCollection().findOne({ _id: contestId })
 
-  if (!result) {
+  if (!contest) {
     const error = new Error('Contest not found')
     error.statusCode = 404
     throw error
   }
+
+  if (status === 'approved' && contest.deadline && new Date(contest.deadline).getTime() <= Date.now()) {
+    const error = new Error('Expired contests cannot be approved')
+    error.statusCode = 409
+    throw error
+  }
+
+  const result = await contestsCollection().findOneAndUpdate(
+    { _id: contestId },
+    { $set: { status, updatedAt: new Date() } },
+    { returnDocument: 'after' },
+  )
 
   return serializeDocument(result)
 }
