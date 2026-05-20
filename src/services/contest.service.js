@@ -4,10 +4,15 @@ import { serializeDocument, toObjectId } from '../utils/mongo.js'
 export const contestTypes = [
   'Image Design',
   'Article Writing',
-  'Marketing Strategy',
-  'Business Idea',
-  'Gaming Review',
+  'Online Gaming',
+  'Singing',
+  'Dancing',
   'UI/UX Design',
+  'Logo Design',
+  'Photography',
+  'Video Editing',
+  'Content Creation',
+  'Coding Challenge',
 ]
 
 function contestsCollection() {
@@ -70,6 +75,24 @@ function normalizeContestPayload(payload) {
     prizeMoney,
     deadline,
   }
+}
+
+function normalizeDeadline(payload, { allowEnded = false } = {}) {
+  const deadline = payload.deadline ? new Date(payload.deadline) : null
+
+  if (!deadline || Number.isNaN(deadline.getTime())) {
+    const error = new Error('Deadline must be a valid date')
+    error.statusCode = 400
+    throw error
+  }
+
+  if (!allowEnded && deadline.getTime() <= Date.now()) {
+    const error = new Error('Deadline must be a future date')
+    error.statusCode = 400
+    throw error
+  }
+
+  return deadline
 }
 
 function approvedContestFilter({ type, search } = {}) {
@@ -178,8 +201,59 @@ export async function updateCreatorContest(id, email, payload) {
     throw error
   }
 
+  if (contest.status === 'approved') {
+    const allowedFields = ['deadline', 'description', 'taskInstruction']
+    const payloadFields = Object.keys(payload || {})
+    const hasOnlyAllowedFields = payloadFields.length > 0 && payloadFields.every((field) => allowedFields.includes(field))
+
+    if (!hasOnlyAllowedFields) {
+      const error = new Error('Only deadline, description, and task instruction can be changed after approval')
+      error.statusCode = 409
+      throw error
+    }
+
+    if (contest.winnerName || contest.winnerUserId) {
+      const error = new Error('Deadline cannot be changed after a winner is declared')
+      error.statusCode = 409
+      throw error
+    }
+
+    const updates = { updatedAt: new Date() }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'deadline')) {
+      updates.deadline = normalizeDeadline(payload, { allowEnded: true })
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'description')) {
+      const description = payload.description?.trim()
+
+      if (!description) {
+        const error = new Error('Description is required')
+        error.statusCode = 400
+        throw error
+      }
+
+      updates.description = description
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, 'taskInstruction')) {
+      const taskInstruction = payload.taskInstruction?.trim()
+
+      if (!taskInstruction) {
+        const error = new Error('Task instruction is required')
+        error.statusCode = 400
+        throw error
+      }
+
+      updates.taskInstruction = taskInstruction
+    }
+
+    await contestsCollection().updateOne({ _id: toObjectId(id) }, { $set: updates })
+    return findCreatorContestById(id, email)
+  }
+
   if (contest.status !== 'pending') {
-    const error = new Error('Only pending contests can be edited')
+    const error = new Error('Only pending contests can be fully edited')
     error.statusCode = 409
     throw error
   }
