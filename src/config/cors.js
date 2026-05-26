@@ -1,9 +1,13 @@
 export function getAllowedOrigins() {
-  const configuredOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
+  const configuredOrigins = (process.env.CLIENT_ORIGIN || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
 
   return Array.from(
     new Set([
-      configuredOrigin,
+      ...configuredOrigins,
+      'https://contest-hub-client-bmor.vercel.app',
       'http://localhost:5173',
       'http://127.0.0.1:5173',
     ]),
