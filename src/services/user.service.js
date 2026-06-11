@@ -12,18 +12,39 @@ export async function findUserByEmail(email) {
   return usersCollection().findOne({ email })
 }
 
-export async function listUsers({ page = 1, limit = 10 } = {}) {
+export async function listUsers({ page = 1, limit = 10, search, role, sort } = {}) {
   const safePage = Math.max(Number(page) || 1, 1)
   const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 50)
+  const filter = {}
+  const normalizedSearch = search?.trim()
+  const normalizedRole = role?.trim()
+
+  if (normalizedSearch) {
+    filter.$or = [
+      { name: { $regex: normalizedSearch, $options: 'i' } },
+      { email: { $regex: normalizedSearch, $options: 'i' } },
+    ]
+  }
+
+  if (allowedRoles.includes(normalizedRole)) {
+    filter.role = normalizedRole
+  }
+
+  const sortOptions = {
+    name: { name: 1, createdAt: -1 },
+    role: { role: 1, createdAt: -1 },
+    newest: { createdAt: -1 },
+  }
+  const userSort = sortOptions[sort] || sortOptions.newest
 
   const [items, total] = await Promise.all([
     usersCollection()
-      .find({})
-      .sort({ createdAt: -1 })
+      .find(filter)
+      .sort(userSort)
       .skip((safePage - 1) * safeLimit)
       .limit(safeLimit)
       .toArray(),
-    usersCollection().countDocuments(),
+    usersCollection().countDocuments(filter),
   ])
 
   return {

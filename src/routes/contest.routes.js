@@ -9,6 +9,7 @@ import {
   deleteCreatorContest,
   findApprovedContestById,
   findCreatorContestById,
+  listRelatedContests,
   listAllContestsForAdmin,
   listApprovedContests,
   listCreatorContests,
@@ -75,8 +76,21 @@ router.get(
 )
 
 router.get(
+  '/:id/related',
+  asyncHandler(async (req, res) => {
+    const contest = await findApprovedContestById(req.params.id)
+
+    if (!contest) {
+      return res.status(404).json({ success: false, message: 'Contest not found' })
+    }
+
+    const data = await listRelatedContests(req.params.id, contest.type, req.query.limit)
+    res.json({ success: true, data })
+  }),
+)
+
+router.get(
   '/:id',
-  verifyJwt,
   asyncHandler(async (req, res) => {
     const contest = await findApprovedContestById(req.params.id)
 

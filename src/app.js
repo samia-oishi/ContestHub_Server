@@ -3,6 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import express from 'express'
 import authRoutes from './routes/auth.routes.js'
+import contactRoutes from './routes/contact.routes.js'
 import contestRoutes from './routes/contest.routes.js'
 import paymentRoutes from './routes/payment.routes.js'
 import registrationRoutes from './routes/registration.routes.js'
@@ -49,6 +50,7 @@ app.get('/health', async (req, res, next) => {
 })
 
 app.use('/auth', authRoutes)
+app.use('/contacts', contactRoutes)
 app.use('/users', userRoutes)
 app.use('/contests', contestRoutes)
 app.use('/payments', paymentRoutes)
